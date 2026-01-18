@@ -56,7 +56,7 @@ Este documento descreve as configurações e detalhes da orquestração de conta
 | spec.externalName | `loki-service.fcg-infra.svc.cluster.local` |
 
 <a id="payments"></a>
-### Notifications
+### Payments
 
 A seguir estão as descrições dos manifestos relacionados ao serviço `payments` (configurações, secrets, service e deployment).
 
