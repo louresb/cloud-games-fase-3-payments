@@ -1,5 +1,6 @@
 using Fiap.CloudGames.Application.Payments.Commands;
 using Fiap.CloudGames.Application.Payments.Events;
+using Fiap.CloudGames.Application.Payments.Services;
 using Fiap.CloudGames.Domain.Payments.Contracts;
 using Fiap.CloudGames.Domain.Payments.Enums;
 using Fiap.CloudGames.Domain.Payments.Repositories;
@@ -10,12 +11,12 @@ namespace Fiap.CloudGames.Application.Payments.Consumers;
 
 public class RefundPaymentConsumer(
     ILogger<RefundPaymentConsumer> logger, 
-    IPublishEndpoint publishEndpoint,
+    IEventPublisher eventPublisher,
     IPaymentRepository paymentRepository,
     IPaymentGateway paymentGateway) : IConsumer<RefundPaymentCommand>
 {
     private readonly ILogger<RefundPaymentConsumer> _logger = logger;
-    private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
     private readonly IPaymentRepository _paymentRepository = paymentRepository;
     private readonly IPaymentGateway _paymentGateway = paymentGateway;
     
@@ -48,7 +49,7 @@ public class RefundPaymentConsumer(
 
             if (!Refunded)
             {
-                await _publishEndpoint.Publish(new PaymentFailedEvent
+                await _eventPublisher.PublishAsync(new PaymentFailedEvent
                 (
                     OrderId: payment.OrderId,
                     UserEmail: payment.UserEmail,
@@ -63,7 +64,7 @@ public class RefundPaymentConsumer(
             payment.MarkAsRefunded(cmd.Reason);
             await _paymentRepository.UpdateAsync(payment, context.CancellationToken);
 
-            await _publishEndpoint.Publish(new PaymentRefundedEvent
+            await _eventPublisher.PublishAsync(new PaymentRefundedEvent
             (
                 OrderId: payment.OrderId,
                 UserEmail: payment.UserEmail,

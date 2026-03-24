@@ -23,6 +23,7 @@ public static class DependencyInjection
     {
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IPaymentGateway, PaymentGateway>();
+        services.AddScoped<Fiap.CloudGames.Application.Payments.Services.IEventPublisher, Fiap.CloudGames.Application.Payments.Services.MassTransitEventPublisher>();
 
         var paymentsCommandsQueue = configuration["Queues:Payments:Commands"] ?? throw new InvalidOperationException("Payments commands queue not configured.");
         var paymentsEventsQueue = configuration["Queues:Payments:Events"] ?? throw new InvalidOperationException("Payments events queue not configured.");

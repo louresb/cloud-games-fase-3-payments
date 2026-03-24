@@ -1,5 +1,6 @@
 using Fiap.CloudGames.Application.Payments.Commands;
 using Fiap.CloudGames.Application.Payments.Events;
+using Fiap.CloudGames.Application.Payments.Services;
 using Fiap.CloudGames.Domain.Payments.Contracts;
 using Fiap.CloudGames.Domain.Payments.Entities;
 using Fiap.CloudGames.Domain.Payments.Enums;
@@ -11,12 +12,12 @@ namespace Fiap.CloudGames.Application.Payments.Consumers;
 
 public class InitiatePaymentConsumer(
     ILogger<InitiatePaymentConsumer> logger, 
-    IPublishEndpoint publishEndpoint,
+    IEventPublisher eventPublisher,
     IPaymentRepository paymentRepository,
     IPaymentGateway paymentGateway) : IConsumer<InitiatePaymentCommand>
 {
     private readonly ILogger<InitiatePaymentConsumer> _logger = logger;
-    private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
     private readonly IPaymentRepository _paymentRepository = paymentRepository;
     private readonly IPaymentGateway _paymentGateway = paymentGateway;
 
@@ -52,7 +53,7 @@ public class InitiatePaymentConsumer(
 
             await _paymentRepository.AddAsync(payment, context.CancellationToken);
 
-            await _publishEndpoint.Publish(new PaymentLinkGeneratedEvent
+            await _eventPublisher.PublishAsync(new PaymentLinkGeneratedEvent
             (
                 OrderId: payment.OrderId,
                 UserEmail: payment.UserEmail,

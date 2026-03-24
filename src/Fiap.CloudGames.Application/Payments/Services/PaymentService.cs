@@ -1,7 +1,6 @@
 using Fiap.CloudGames.Application.Payments.Dtos;
 using Fiap.CloudGames.Application.Payments.Events;
 using Fiap.CloudGames.Domain.Payments.Repositories;
-using MassTransit;
 using Microsoft.Extensions.Logging;
 
 namespace Fiap.CloudGames.Application.Payments.Services;
@@ -9,11 +8,11 @@ namespace Fiap.CloudGames.Application.Payments.Services;
 public class PaymentService(
     ILogger<PaymentService> logger,
     IPaymentRepository repository,
-    IPublishEndpoint publishEndpoint) : IPaymentService
+    IEventPublisher eventPublisher) : IPaymentService
 {
     private readonly ILogger<PaymentService> _logger = logger;
     private readonly IPaymentRepository _repository = repository;
-    private readonly IPublishEndpoint _publishEndpoint = publishEndpoint;
+    private readonly IEventPublisher _eventPublisher = eventPublisher;
 
     public async Task<string> ProcessTransactionAsync(PaymentGatewayCallbackDto dto, CancellationToken ct)
     {
@@ -29,7 +28,7 @@ public class PaymentService(
                 payment.MarkAsSucceeded();
                 await _repository.UpdateAsync(payment, ct);
 
-                await _publishEndpoint.Publish(new PaymentSucceededEvent
+                await _eventPublisher.PublishAsync(new PaymentSucceededEvent
                 (
                     OrderId: payment.OrderId,
                     UserEmail: payment.UserEmail,
@@ -43,7 +42,7 @@ public class PaymentService(
                 payment.MarkAsCancelled("Cancelado via callback do gateway");
                 await _repository.UpdateAsync(payment, ct);
 
-                await _publishEndpoint.Publish(new PaymentFailedEvent
+                await _eventPublisher.PublishAsync(new PaymentFailedEvent
                 (
                     OrderId: payment.OrderId,
                     UserEmail: payment.UserEmail,
@@ -56,7 +55,7 @@ public class PaymentService(
                 payment.MarkAsFailed("Falha via callback do gateway");
                 await _repository.UpdateAsync(payment, ct);
 
-                await _publishEndpoint.Publish(new PaymentFailedEvent
+                await _eventPublisher.PublishAsync(new PaymentFailedEvent
                 (
                     OrderId: payment.OrderId,
                     UserEmail: payment.UserEmail,
