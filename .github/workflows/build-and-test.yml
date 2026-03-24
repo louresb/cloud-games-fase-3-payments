@@ -25,30 +25,30 @@ env:
 
 jobs:
   build-and-test:
-    name: Build & Test (.NET 8)
+    name: Build & Test (.NET 10)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8.x
+      - name: Setup .NET 10.x
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restore tools
         run: dotnet tool restore
 
       - name: Restore dependencies
-        run: dotnet restore ./cloud-games-fase-2-payments.sln
+        run: dotnet restore ./cloud-games-fase-3-payments.sln
 
       - name: Build (Release)
-        run: dotnet build ./cloud-games-fase-2-payments.sln --configuration Release --no-restore
+        run: dotnet build ./cloud-games-fase-3-payments.sln --configuration Release --no-restore
 
       - name: Test (with coverage)
         run: >
-          dotnet test ./cloud-games-fase-2-payments.sln
+          dotnet test ./cloud-games-fase-3-payments.sln
           --configuration Release
           --no-build
           --logger "trx;LogFileName=test_results.trx"
