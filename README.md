@@ -1,7 +1,7 @@
-# Tech Challenge - FIAP Cloud Games - 10NETT - Grupo 30 - Fase 2
+# Tech Challenge - FIAP Cloud Games - 10NETT - Grupo 30 - Fase 3
 
-![Build & Tests](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-payments/actions/workflows/build-and-test.yml/badge.svg)
-[![Version](https://img.shields.io/github/v/tag/FIAP-10NETT-Grupo-30/cloud-games-fase-2-payments?label=version&sort=semver)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-payments/tags)
+![Build & Tests](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/actions/workflows/build-and-test.yml/badge.svg)
+[![Version](https://img.shields.io/github/v/tag/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments?label=version&sort=semver)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/tags)
 
 ## Microsserviço de Pagamentos (PaymentsWorker)
 
@@ -12,9 +12,9 @@ Este repositório contém o **Microsserviço de Pagamentos** da aplicação FIAP
 ## Sumário 📝
 
 - Documentos
-  - [Instruções TC Fase 2 (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration/blob/main/docs/TC-NETT-FASE-2.md)
-  - [Processo de Colaboração (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration/blob/main/docs/PROCESSO-COLABORACAO.md)
-  - [Fluxos (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration/blob/main/docs/Fluxos/README.md)
+    - [Instruções TC Fase 2 (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/TC-NETT-FASE-2.md)
+    - [Processo de Colaboração (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/PROCESSO-COLABORACAO.md)
+    - [Fluxos (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/Fluxos/README.md)
   - [Kubernetes](./k8s/README.md)
 - [Sobre este Microsserviço](#sobre-este-microsservico)
   - [Responsabilidades](#responsabilidades)
@@ -200,9 +200,9 @@ sequenceDiagram
 <a id="executando-localmente-com-docker-compose"></a>
 ### Executando localmente com Docker Compose ⚡
 
-**A forma recomendada de executar a aplicação completa é através do [Repositório de Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration)**, que contém todos os docker-compose files e scripts necessários. 
+**A forma recomendada de executar a aplicação completa é através do [Repositório de Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws)**, que contém todos os docker-compose files e scripts necessários. 
 
-Consulte o [guia de execução com Docker Compose](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration/blob/main/docs/Compose/README.md) no repositório de orquestração. 
+Consulte o [guia de execução com Docker Compose](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/Compose/README.md) no repositório de orquestração. 
 
 <a id="executando-localmente-com-net"></a>
 ### Executando localmente com .NET 🔧
@@ -211,8 +211,8 @@ Para desenvolvimento local sem Docker:
 
 1. Clone o repositório: 
    ```bash
-   git clone https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-payments.git
-   cd cloud-games-fase-2-payments
+    git clone https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments.git
+    cd cloud-games-fase-3-payments
    ```
 
 2. Restaurar as ferramentas do .NET:
@@ -235,13 +235,13 @@ Para desenvolvimento local sem Docker:
 
 4. Garantir que a infraestrutura esteja rodando:
    ```bash
-   cd ../../cloud-games-fase-2-orchestration
+    cd ../../cloud-games-fase-3-orchestration-aws
    docker-compose -f docker-compose.infra.yaml up -d
    ```
 
 5. Aplicar as migrações do banco de dados:
    ```bash
-   cd ../cloud-games-fase-2-payments
+    cd ../cloud-games-fase-3-payments
    dotnet ef database update --project src/Fiap.CloudGames.Infrastructure --startup-project src/Fiap.CloudGames.Worker --context AppDbContext
    ```
 
@@ -353,7 +353,7 @@ kubectl get service payments-service -n fcg-apps
 ├── .gitattributes
 ├── .gitignore
 ├── Dockerfile
-├── cloud-games-fase-2-payments.sln
+├── cloud-games-fase-3-payments.sln
 ├── global.json
 └── README.md
 ```
@@ -445,7 +445,7 @@ Estas variáveis podem ser configuradas via **appsettings.json** (desenvolviment
 
 ## Repositórios Relacionados 🔗
 
-- **[Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-orchestration)**: Docker Compose e Kubernetes para toda a infraestrutura
-- **[Usuários](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-users)**: Microsserviço de autenticação e autorização
-- **[Catálogo](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-catalog)**: Microsserviço de gerenciamento de jogos e pedidos
-- **[Notificações](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-2-notifications)**: Microsserviço de envio de notificações
+- **[Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws)**: Docker Compose e Kubernetes para toda a infraestrutura
+- **[Usuários](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-users)**: Microsserviço de autenticação e autorização
+- **[Catálogo](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-catalog)**: Microsserviço de gerenciamento de jogos e pedidos
+- **[Notificações](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-notifications)**: Microsserviço de envio de notificações
