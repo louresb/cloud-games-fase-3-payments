@@ -1,8 +1,5 @@
 # FIAP Cloud Games - Microsservico de Pagamentos (Fase 3)
 
-![Build & Tests](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/actions/workflows/build-and-test.yml/badge.svg)
-[![Version](https://img.shields.io/github/v/tag/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments?label=version&sort=semver)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/tags)
-
 Microsservico responsavel pelo ciclo de pagamentos da plataforma FIAP Cloud Games: criacao de transacoes, processamento de callback do gateway, estornos e publicacao de eventos para os demais servicos da plataforma.
 
 ## Sumario
