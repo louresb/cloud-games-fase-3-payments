@@ -1,451 +1,315 @@
-# Tech Challenge - FIAP Cloud Games - 10NETT - Grupo 30 - Fase 3
+# FIAP Cloud Games - Microsservico de Pagamentos (Fase 3)
 
 ![Build & Tests](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/actions/workflows/build-and-test.yml/badge.svg)
 [![Version](https://img.shields.io/github/v/tag/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments?label=version&sort=semver)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments/tags)
 
-## Microsserviço de Pagamentos (PaymentsWorker)
+Microsservico responsavel pelo ciclo de pagamentos da plataforma FIAP Cloud Games: criacao de transacoes, processamento de callback do gateway, estornos e publicacao de eventos para os demais servicos da plataforma.
 
-Este repositório contém o **Microsserviço de Pagamentos** da aplicação FIAP Cloud Games, responsável por processar pagamentos, gerar links de pagamento, processar estornos e notificar outros serviços sobre o status das transações na arquitetura de microsserviços orientada a eventos.
+## Sumario
 
----
-
-## Sumário 📝
-
-- Documentos
-    - [Instruções TC Fase 2 (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/TC-NETT-FASE-2.md)
-    - [Processo de Colaboração (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/PROCESSO-COLABORACAO.md)
-    - [Fluxos (Repositório de Orquestração)](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/Fluxos/README.md)
-  - [Kubernetes](./k8s/README.md)
-- [Sobre este Microsserviço](#sobre-este-microsservico)
-  - [Responsabilidades](#responsabilidades)
-  - [Fluxos de Integração](#fluxos-de-integracao)
-- [Como rodar o projeto](#como-rodar-o-projeto)
-  - [Pré-requisitos](#pre-requisitos)
-  - [Executando localmente com Docker Compose](#executando-localmente-com-docker-compose)
-  - [Executando localmente com .NET](#executando-localmente-com-net)
-  - [Deploy no Kubernetes](#deploy-no-kubernetes)
+- [Arquitetura AWS (Fase 3)](#arquitetura-aws-fase-3)
+- [Diagrama de Arquitetura](#diagrama-de-arquitetura)
+- [Fluxo Assincrono](#fluxo-assincrono)
+- [Responsabilidades do Microsservico](#responsabilidades-do-microsservico)
+- [Fluxos de Integracao](#fluxos-de-integracao)
+- [Como Rodar o Projeto](#como-rodar-o-projeto)
 - [Estrutura de Pastas](#estrutura-de-pastas)
-- [Arquitetura do Projeto](#arquitetura-do-projeto)
-- [Variáveis de Ambiente](#variaveis-de-ambiente)
+- [Arquitetura do Projeto (Clean Architecture)](#arquitetura-do-projeto-clean-architecture)
+- [Tecnologias Utilizadas](#tecnologias-utilizadas)
+- [Variaveis de Ambiente](#variaveis-de-ambiente)
+- [Repositorios Relacionados](#repositorios-relacionados)
 
 ---
 
-<a id="sobre-este-microsservico"></a>
-## Sobre este Microsserviço 🎯
+## Arquitetura AWS (Fase 3)
 
-<a id="responsabilidades"></a>
-### Responsabilidades
+A entrega da Fase 3 e executada integralmente em AWS, com deploy de servicos conteinerizados, mensageria assincrona e processamento orientado a eventos.
 
-O **Microsserviço de Pagamentos** é responsável por:
+Servicos AWS utilizados:
 
-- ✅ **Geração de Links de Pagamento**: Cria links únicos para pagamento após receber pedidos via comando
-- ✅ **Processamento de Callbacks**: Recebe callbacks do gateway de pagamento simulado via webhook
-- ✅ **Gestão de Transações**: Armazena e gerencia o histórico de todas as transações de pagamento
-- ✅ **Processamento de Estornos**: Processa solicitações de reembolso de pedidos via comando
-- ✅ **Integração com Catalog**: Consome comandos e publica eventos para o serviço de Catálogo
-- ✅ **Integração com Notifications**: Publica eventos para o serviço de Notificações
-- ✅ **Simulação de Gateway**: Fornece endpoint REST para simular callbacks de aprovação/rejeição de pagamentos
-- ✅ **API REST com Swagger**: Expõe documentação interativa da API para o endpoint de webhook
+- Amazon ECR para versionamento e armazenamento de imagens
+- Amazon ECS com Fargate para execucao do microsservico
+- Amazon SQS para filas e intercambio assincrono de mensagens
+- AWS Lambda para processamento de notificacoes orientadas a evento
+- Amazon CloudWatch para logs, metricas e observabilidade operacional
+- Terraform (via repositorio de orquestracao) para provisionamento de infraestrutura
 
-<a id="fluxos-de-integracao"></a>
-### Fluxos de Integração
+---
 
-#### 1️⃣ Fluxo de Iniciação de Pagamento
+## Diagrama de Arquitetura
 
 ```mermaid
-sequenceDiagram
-    participant CatalogAPI
-    participant RabbitMQ
-    participant PaymentsWorker
-    participant NotificationsWorker
-
-    CatalogAPI->>RabbitMQ: Send InitiatePaymentCommand
-    RabbitMQ->>PaymentsWorker:  Consume InitiatePaymentCommand
-    PaymentsWorker->>PaymentsWorker:  Criar Payment
-    PaymentsWorker->>PaymentsWorker: Gerar Link de Pagamento
-    PaymentsWorker->>RabbitMQ: Publish PaymentLinkGeneratedEvent
-    RabbitMQ->>CatalogAPI: Consume PaymentLinkGeneratedEvent
-    RabbitMQ->>NotificationsWorker: Consume PaymentLinkGeneratedEvent
+flowchart LR
+    Client[API Gateway / Servicos de Dominio] --> ECS[Payments Service on ECS Fargate]
+    ECS --> SQL[(SQL Server)]
+    ECS --> SQS_CMD[SQS - payments.commands]
+    ECS --> SQS_EVT[SQS - catalog.events / notifications.events]
+    SQS_EVT --> LAMBDA[AWS Lambda - Notifications Processor]
+    ECS --> CW[Amazon CloudWatch Logs]
+    LAMBDA --> CW
 ```
 
-**Comando Consumido:**
-- **Queue**: `payments.commands`
-- **Command**: `InitiatePaymentCommand`
-- **Dados**: `OrderId`, `Amount`, `UserId`, `UserEmail`
-- **Ação**:  Cria transação de pagamento e gera link único
+---
 
-**Evento Publicado:**
-- **Queue**: `catalog.events` e `notifications.events`
-- **Event**: `PaymentLinkGeneratedEvent`
-- **Dados**: `OrderId`, `UserEmail`, `PaymentTransactionId`, `PaymentLinkUrl`
-
-#### 2️⃣ Fluxo de Processamento de Pagamento
+## Fluxo Assincrono
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant PaymentGateway
-    participant PaymentsWorker
-    participant RabbitMQ
-    participant CatalogAPI
-    participant NotificationsWorker
+    participant Catalog as Catalog Service
+    participant SQSCommands as SQS payments.commands
+    participant Payments as Payments Service
+    participant SQSEvents as SQS catalog.events / notifications.events
+    participant Lambda as AWS Lambda Notifications
 
-    User->>PaymentGateway: Acessa Link de Pagamento
-    PaymentGateway->>PaymentGateway: Processar Pagamento
-    PaymentGateway->>PaymentsWorker: POST /api/webhooks/gateway-notification (callback)
-    alt Pagamento Aprovado
-        PaymentsWorker->>PaymentsWorker: Atualizar Status → Succeeded
-        PaymentsWorker->>RabbitMQ: Publish PaymentSucceededEvent
-        RabbitMQ->>CatalogAPI: Consume PaymentSucceededEvent
-        RabbitMQ->>NotificationsWorker: Consume PaymentSucceededEvent
-    else Pagamento Rejeitado ou Cancelado
-        PaymentsWorker->>PaymentsWorker: Atualizar Status → Failed/Cancelled
-        PaymentsWorker->>RabbitMQ: Publish PaymentFailedEvent
-        RabbitMQ->>CatalogAPI: Consume PaymentFailedEvent
-        RabbitMQ->>NotificationsWorker: Consume PaymentFailedEvent
+    Catalog->>SQSCommands: Publish Event (InitiatePaymentCommand)
+    Payments->>SQSCommands: Consume Message
+    Payments->>Payments: Process Event (create transaction + payment link)
+    Payments->>SQSEvents: Publish Event (PaymentLinkGeneratedEvent)
+    Lambda->>SQSEvents: Consume Message
+    Lambda->>Lambda: Process Event (notification workflow)
+```
+
+---
+
+## Responsabilidades do Microsservico
+
+- Gerar links de pagamento a partir de comandos recebidos
+- Processar callbacks do gateway no endpoint de webhook
+- Atualizar status de transacoes (Succeeded, Failed, Cancelled, Refunded)
+- Processar solicitacoes de estorno
+- Publicar eventos de dominio para os servicos de Catalogo e Notificacoes
+- Expor endpoint HTTP para simulacao e validacao de callbacks de pagamento
+
+---
+
+## Fluxos de Integracao
+
+### 1. Iniciacao de Pagamento
+
+```mermaid
+sequenceDiagram
+    participant Catalog as Catalog Service
+    participant SQSCommands as SQS payments.commands
+    participant Payments as Payments Service
+    participant SQSEvents as SQS catalog.events / notifications.events
+
+    Catalog->>SQSCommands: Publish Event (InitiatePaymentCommand)
+    Payments->>SQSCommands: Consume Message
+    Payments->>Payments: Process Event (create payment + link)
+    Payments->>SQSEvents: Publish Event (PaymentLinkGeneratedEvent)
+```
+
+Entrada:
+
+- Queue: payments.commands
+- Message: InitiatePaymentCommand
+- Campos: OrderId, Amount, UserId, UserEmail
+
+Saida:
+
+- Queue: catalog.events e notifications.events
+- Event: PaymentLinkGeneratedEvent
+- Campos: OrderId, UserEmail, PaymentTransactionId, PaymentLinkUrl
+
+### 2. Processamento de Pagamento (Webhook)
+
+```mermaid
+sequenceDiagram
+    participant User as Usuario
+    participant Gateway as Payment Gateway
+    participant Payments as Payments Service
+    participant SQSEvents as SQS catalog.events / notifications.events
+
+    User->>Gateway: Acessa link de pagamento
+    Gateway->>Payments: POST /api/webhooks/gateway-notification
+    Payments->>Payments: Process Event (update payment status)
+    alt Pagamento aprovado
+        Payments->>SQSEvents: Publish Event (PaymentSucceededEvent)
+    else Pagamento rejeitado/cancelado
+        Payments->>SQSEvents: Publish Event (PaymentFailedEvent)
     end
 ```
 
-**Endpoint de Webhook:**
-- **URL**: `POST /api/webhooks/gateway-notification`
-- **Autenticação**: Header `X-WEBHOOK-API-KEY` (configurado via `PaymentSettings:WebhookApiKey`)
-- **Payload**: `PaymentGatewayCallbackDto` com `PaymentTransactionId` e `Status` (success, cancelled, failed)
-- **Ação**: Atualiza status do pagamento e publica evento correspondente
+Endpoint:
 
-**Eventos Publicados:**
+- URL: POST /api/webhooks/gateway-notification
+- Header: X-WEBHOOK-API-KEY
+- Payload: PaymentGatewayCallbackDto
 
-**Sucesso:**
-- **Queue**: `catalog.events` e `notifications.events`
-- **Event**: `PaymentSucceededEvent`
-- **Dados**: `OrderId`, `UserEmail`, `PaymentTransactionId`, `ProcessedAt`
-
-**Falha:**
-- **Queue**: `catalog.events` e `notifications.events`
-- **Event**: `PaymentFailedEvent`
-- **Dados**: `OrderId`, `UserEmail`, `FailedReason`
-
-#### 3️⃣ Fluxo de Estorno de Pagamento
+### 3. Estorno de Pagamento
 
 ```mermaid
 sequenceDiagram
-    participant CatalogAPI
-    participant RabbitMQ
-    participant PaymentsWorker
-    participant NotificationsWorker
+    participant Catalog as Catalog Service
+    participant SQSCommands as SQS payments.commands
+    participant Payments as Payments Service
+    participant SQSEvents as SQS catalog.events / notifications.events
 
-    CatalogAPI->>RabbitMQ: Send RefundPaymentCommand
-    RabbitMQ->>PaymentsWorker: Consume RefundPaymentCommand
-    PaymentsWorker->>PaymentsWorker:  Validar Transação
-    alt Estorno Bem-Sucedido
-        PaymentsWorker->>PaymentsWorker: Atualizar Status → Refunded
-        PaymentsWorker->>RabbitMQ:  Publish PaymentRefundedEvent
-        RabbitMQ->>CatalogAPI: Consume PaymentRefundedEvent
-        RabbitMQ->>NotificationsWorker: Consume PaymentRefundedEvent
-    else Estorno Falhou
-        PaymentsWorker->>PaymentsWorker:  Registrar Falha
-        PaymentsWorker->>RabbitMQ:  Publish PaymentFailedEvent
-        RabbitMQ->>CatalogAPI:  Consume PaymentFailedEvent
+    Catalog->>SQSCommands: Publish Event (RefundPaymentCommand)
+    Payments->>SQSCommands: Consume Message
+    Payments->>Payments: Process Event (validate and refund)
+    alt Estorno concluido
+        Payments->>SQSEvents: Publish Event (PaymentRefundedEvent)
+    else Erro no estorno
+        Payments->>SQSEvents: Publish Event (PaymentFailedEvent)
     end
 ```
 
-**Comando Consumido:**
-- **Queue**: `payments.commands`
-- **Command**: `RefundPaymentCommand`
-- **Dados**: `OrderId`, `UserId`, `Reason`
-- **Ação**: Processa estorno e atualiza status da transação
+Entrada:
 
-**Eventos Publicados:**
+- Queue: payments.commands
+- Message: RefundPaymentCommand
+- Campos: OrderId, UserId, Reason
 
-**Sucesso:**
-- **Queue**: `catalog.events` e `notifications.events`
-- **Event**: `PaymentRefundedEvent`
-- **Dados**: `OrderId`, `UserEmail`, `RefundedAt`
+Saida:
 
-**Falha:**
-- **Queue**: `catalog.events` e `notifications.events`
-- **Event**: `PaymentFailedEvent`
-- **Dados**: `OrderId`, `UserEmail`, `FailedReason`
+- Queue: catalog.events e notifications.events
+- Events: PaymentRefundedEvent, PaymentFailedEvent
 
 ---
 
-### Resumo dos Comandos Consumidos
+## Como Rodar o Projeto
 
-| Comando | Ação no Payments | Consumer |
-|---------|------------------|----------|
-| `InitiatePaymentCommand` | Cria transação e gera link de pagamento | `InitiatePaymentConsumer` |
-| `RefundPaymentCommand` | Processa estorno da transação | `RefundPaymentConsumer` |
+### Pre-requisitos
 
-### Resumo dos Eventos Publicados
+- Git
+- .NET SDK 8+
+- SQL Server acessivel para a aplicacao
+- dotnet-ef (restaurado via tool manifest)
 
-| Evento | Destino | Dados |
-|--------|---------|-------|
-| `PaymentLinkGeneratedEvent` | Catalog, Notifications | OrderId, UserEmail, PaymentTransactionId, PaymentLinkUrl |
-| `PaymentSucceededEvent` | Catalog, Notifications | OrderId, UserEmail, PaymentTransactionId, ProcessedAt |
-| `PaymentFailedEvent` | Catalog, Notifications | OrderId, UserEmail, FailedReason |
-| `PaymentRefundedEvent` | Catalog, Notifications | OrderId, UserEmail, RefundedAt |
+### Execucao local com .NET
 
----
+1. Clonar o repositorio
 
-<a id="como-rodar-o-projeto"></a>
-## Como rodar o projeto ▶️
-
-<a id="pre-requisitos"></a>
-### Pré-requisitos ⚙️
-
-- [Git](https://git-scm.com/downloads) instalado na sua máquina
-- [Docker Desktop](https://www.docker.com/get-started) instalado e em execução
-- [.NET 8 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) ou superior (para execução local sem Docker)
-- [DBeaver](https://dbeaver.io/download/) ou outro cliente de banco de dados compatível com SQL Server
-
-<a id="executando-localmente-com-docker-compose"></a>
-### Executando localmente com Docker Compose ⚡
-
-**A forma recomendada de executar a aplicação completa é através do [Repositório de Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws)**, que contém todos os docker-compose files e scripts necessários. 
-
-Consulte o [guia de execução com Docker Compose](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws/blob/main/docs/Compose/README.md) no repositório de orquestração. 
-
-<a id="executando-localmente-com-net"></a>
-### Executando localmente com .NET 🔧
-
-Para desenvolvimento local sem Docker: 
-
-1. Clone o repositório: 
    ```bash
-    git clone https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments.git
-    cd cloud-games-fase-3-payments
+   git clone https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-payments.git
+   cd cloud-games-fase-3-payments
    ```
 
-2. Restaurar as ferramentas do .NET:
+2. Restaurar ferramentas e dependencias
+
    ```bash
    dotnet tool restore
+   dotnet restore ./cloud-games-fase-3-payments.sln
    ```
 
-3. Configurar o User Secrets: 
+3. Configurar secrets locais
+
    ```bash
    cd src/Fiap.CloudGames.Worker
    dotnet user-secrets init
-   
-   # Configurar as secrets necessárias
    dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost,1433;Database=CloudGamesPayments;User Id=sa;Password=SuaSenha;TrustServerCertificate=True;"
-   dotnet user-secrets set "RabbitMq:HostName" "localhost"
-   dotnet user-secrets set "RabbitMq:UserName" "guest"
-   dotnet user-secrets set "RabbitMq:Password" "guest"
    dotnet user-secrets set "PaymentSettings:WebhookApiKey" "your-local-api-key-for-testing"
    ```
 
-4. Garantir que a infraestrutura esteja rodando:
-   ```bash
-    cd ../../cloud-games-fase-3-orchestration-aws
-   docker-compose -f docker-compose.infra.yaml up -d
-   ```
+4. Aplicar migracoes
 
-5. Aplicar as migrações do banco de dados:
    ```bash
-    cd ../cloud-games-fase-3-payments
+   cd ../../
    dotnet ef database update --project src/Fiap.CloudGames.Infrastructure --startup-project src/Fiap.CloudGames.Worker --context AppDbContext
    ```
 
-6. Executar a aplicação:
+5. Executar o servico
+
    ```bash
    dotnet run --project src/Fiap.CloudGames.Worker
    ```
 
-7. Verificar os logs e acessar a API:
-   - **Swagger UI**: `http://localhost:5000/swagger` ou `http://localhost:5001/swagger` (HTTPS)
-   - **OpenAPI JSON**: `http://localhost:5000/swagger/v1/swagger.json`
-   - Monitore os logs no console para verificar o consumo de mensagens
-   - Acesse o RabbitMQ Management em `http://localhost:15672` para visualizar as filas
-   - **Endpoint de webhook**: `POST /api/webhooks/gateway-notification` (requer header `X-WEBHOOK-API-KEY`)
-   
-   > **Nota**: O Swagger está disponível apenas em ambiente de desenvolvimento. A porta HTTP padrão é 5000, mas pode variar. Verifique a saída do console ao iniciar a aplicação para confirmar a porta correta.
+6. Validar endpoints
 
-<a id="deploy-no-kubernetes"></a>
-### Deploy no Kubernetes ☸️
+- Swagger UI: http://localhost:5000/swagger
+- OpenAPI JSON: http://localhost:5000/swagger/v1/swagger.json
+- Health check live: http://localhost:5000/health/live
+- Health check ready: http://localhost:5000/health/ready
 
-Consulte a [documentação de Kubernetes](./k8s/README.md) para instruções detalhadas. 
+### Deploy e infraestrutura em AWS
 
-Resumo dos comandos: 
+Provisionamento, pipelines e infraestrutura de execucao em AWS estao centralizados no repositorio de orquestracao:
 
-```bash
-# Build da imagem Docker
-docker build -t cloud-games-payments-svc:latest .
-
-# Aplicar os manifestos
-kubectl apply -f k8s/fcg-apps-namespace.yaml
-kubectl apply -f k8s/externalnames-service.yaml
-kubectl apply -f k8s/payments-secret.yaml
-kubectl apply -f k8s/payments-configmap.yaml
-kubectl apply -f k8s/payments-service.yaml
-kubectl apply -f k8s/payments-deployment.yaml
-
-# Verificar o status
-kubectl get pods -n fcg-apps
-kubectl get services -n fcg-apps
-
-# Verificar logs
-kubectl logs deployment/payments-deployment -n fcg-apps -f
-```
-
-**Acessando o Swagger no Kubernetes:**
-
-```bash
-# Obter a porta NodePort atribuída (padrão: 30082)
-kubectl get service payments-service -n fcg-apps
-
-# Acessar via navegador (substitua <NODE-IP> pelo IP do seu node)
-# Swagger UI: http://<NODE-IP>:30082/swagger
-# Exemplo local: http://localhost:30082/swagger
-```
+- https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws
 
 ---
 
-<a id="estrutura-de-pastas"></a>
-## Estrutura de Pastas 📁
+## Estrutura de Pastas
 
-```
+```text
+.
 ├── .config/
-│   └── dotnet-tools.json              # Configurações de ferramentas do .NET CLI (EF Core)
-│
-├── k8s/                                # Manifests do Kubernetes
-│   ├── templates/                      # Templates de exemplo para secrets
-│   ├── fcg-apps-namespace.yaml         # Namespace do Kubernetes
-│   ├── externalnames-service.yaml      # ExternalNames para SQL Server, RabbitMQ e Loki
-│   ├── payments-secret.yaml            # Secrets (não comitado - use o template)
-│   ├── payments-configmap.yaml         # ConfigMaps com configurações não sensíveis
-│   ├── payments-service.yaml           # Service do Kubernetes (NodePort)
-│   ├── payments-deployment.yaml        # Deployment do Kubernetes
-│   └── README.md                       # Documentação detalhada do Kubernetes
-│
 ├── src/
-│   ├── Fiap.CloudGames.Worker/        # Camada de Worker (Background Service + Web API)
-│   │   ├── Program.cs                  # Ponto de entrada da aplicação
-│   │   └── appsettings.json            # Configurações da aplicação
-│   │
-│   ├── Fiap.CloudGames.Application/   # Serviços de aplicação e casos de uso
-│   │   └── Payments/                   # Contexto de Pagamentos
-│   │       ├── Services/               # Serviços de negócio
-│   │       ├── Consumers/              # Consumidores de comandos
-│   │       ├── Events/                 # Definições de eventos publicados
-│   │       └── Commands/               # Definições de comandos consumidos
-│   │
-│   ├── Fiap.CloudGames.Domain/        # Entidades, Value Objects, Enums e Interfaces
+│   ├── Fiap.CloudGames.Worker/
+│   ├── Fiap.CloudGames.Application/
 │   │   └── Payments/
-│   │       ├── Entities/               # Payment
-│   │       ├── Enums/                  # PaymentStatus
-│   │       ├── Repositories/           # IPaymentRepository
-│   │       └── Contracts/              # IPaymentGateway
-│   │
-│   └── Fiap.CloudGames.Infrastructure/ # Implementações de persistência e integrações
-│       ├── Persistence/                # EF Core, Migrations, Repositories
-│       │   ├── EntityConfigurations/   # Configurações do EF Core
-│       │   ├── Migrations/             # Migrações do banco de dados
-│       │   └── AppDbContext.cs         # DbContext
-│       ├── Payments/
-│       │   ├── Repositories/           # PaymentRepository
-│       │   └── Services/               # PaymentGateway
-│       └── DependencyInjection.cs      # Configuração de dependências
-│
+│   ├── Fiap.CloudGames.Domain/
+│   │   └── Payments/
+│   ├── Fiap.CloudGames.Infrastructure/
+│   │   ├── Payments/
+│   │   └── Persistence/
+│   └── Fiap.CloudGames.Payments.Lambda/
 ├── tests/
-│   └── Fiap.CloudGames.Tests/         # Testes Unitários
-│
-├── .dockerignore
-├── .editorconfig
-├── .gitattributes
-├── .gitignore
+│   └── Fiap.CloudGames.Tests/
 ├── Dockerfile
 ├── cloud-games-fase-3-payments.sln
-├── global.json
 └── README.md
 ```
 
 ---
 
-<a id="arquitetura-do-projeto"></a>
-## Arquitetura do Projeto 🏛️
+## Arquitetura do Projeto (Clean Architecture)
 
-Este microsserviço segue uma **arquitetura em camadas** (Clean Architecture / Onion Architecture), separando as responsabilidades e facilitando a manutenção e testes.
+O microsservico adota Clean Architecture para isolamento de responsabilidades e evolucao segura de regras de negocio.
 
-### Principais Camadas
+Camadas:
 
-- **Worker (Fiap.CloudGames.Worker)**: Background service que executa continuamente consumindo mensagens + API REST com endpoint de webhook
-- **Application (Fiap.CloudGames.Application)**: Serviços de aplicação, casos de uso, consumers de comandos e publicadores de eventos
-- **Domain (Fiap.CloudGames.Domain)**: Entidades, value objects, enums e interfaces (contratos)
-- **Infrastructure (Fiap.CloudGames.Infrastructure)**: Implementações concretas de persistência (EF Core) e mensageria (RabbitMQ/MassTransit)
-
-### Tecnologias Utilizadas
-
-- **Framework**: .NET 8
-- **Tipo de Aplicação**: Web API com Background Service (Worker + API REST)
-- **Banco de Dados**: SQL Server com Entity Framework Core
-- **Mensageria**: RabbitMQ com MassTransit
-- **Logging**: Serilog com sink para Grafana Loki
-- **Documentação API**: Swagger/OpenAPI
-- **Containerização**: Docker (multi-stage build)
-- **Orquestração**: Kubernetes
-
-### Diagrama de Dependências
-
-```mermaid
-graph TD
-    A[Fiap.CloudGames.Worker] --> B[Fiap.CloudGames.Application]
-    A --> D[Fiap.CloudGames.Infrastructure]
-    
-    B --> C[Fiap.CloudGames.Domain]
-    
-    D --> C
-    D --> E[SQL Server]
-    D --> F[RabbitMQ]
-    D --> G[Loki]
-    
-    F --> H[Payments Commands Queue]
-    H --> B
-    B --> I[Catalog Events Queue]
-    B --> J[Notifications Events Queue]
-```
-
-### Bibliotecas Principais
-
-- `Microsoft.EntityFrameworkCore.SqlServer` - Provedor SQL Server para EF Core
-- `MassTransit.RabbitMQ` - Mensageria com RabbitMQ
-- `Serilog.AspNetCore` - Logging estruturado
-- `Serilog.Sinks.Grafana.Loki` - Sink do Serilog para Loki
-- `Microsoft.Extensions.Hosting` - Suporte para Worker Services
+- Worker: exposicao HTTP, composicao da aplicacao e bootstrap
+- Application: casos de uso, handlers, eventos e contratos de aplicacao
+- Domain: entidades, enums e contratos de dominio
+- Infrastructure: persistencia, integracoes externas e implementacoes tecnicas
+- Lambda: publicacao/processamento de eventos para notificacoes na arquitetura AWS
 
 ---
 
-<a id="variaveis-de-ambiente"></a>
-## Variáveis de Ambiente 🔐
+## Tecnologias Utilizadas
 
-### Configurações Sensíveis (Secrets)
-
-Estas variáveis devem ser configuradas via **User Secrets** (desenvolvimento local) ou **Kubernetes Secrets** (produção/cluster):
-
-| Variável | Descrição | Exemplo |
-|----------|-----------|---------|
-| `ConnectionStrings__DefaultConnection` | Connection string do SQL Server | `Server=sqlserver-service,1433;Database=CloudGamesPayments;User Id=sa;Password=***;TrustServerCertificate=True;` |
-| `RabbitMq__HostName` | Hostname do RabbitMQ | `rabbitmq-service` |
-| `RabbitMq__UserName` | Usuário do RabbitMQ | `guest` |
-| `RabbitMq__Password` | Senha do RabbitMQ | `***` |
-| `PaymentSettings__WebhookApiKey` | Chave API para autenticação do webhook de callback do gateway | `your-256-bit-secret` |
-
-### Configurações Não Sensíveis (ConfigMaps)
-
-Estas variáveis podem ser configuradas via **appsettings.json** (desenvolvimento) ou **Kubernetes ConfigMaps** (cluster):
-
-| Variável | Descrição | Valor Padrão |
-|----------|-----------|--------------|
-| `ASPNETCORE_ENVIRONMENT` | Ambiente de execução | `Development` / `Production` |
-| `Queues__Payments__Commands` | Nome da fila de comandos de pagamentos | `payments.commands` |
-| `Queues__Payments__Events` | Nome da fila de eventos de pagamentos | `payments.events` |
-| `Queues__Catalog__Events` | Nome da fila de eventos de catálogo | `catalog.events` |
-| `Queues__Notifications__Events` | Nome da fila de eventos de notificações | `notifications.events` |
-| `Loki__Url` | URL do servidor Loki para logging | `http://loki-service:3100` |
+- .NET 8 / ASP.NET Core
+- Entity Framework Core (SQL Server)
+- AWS SDK for .NET (SQS)
+- AWS Lambda (.NET)
+- Amazon ECS Fargate
+- Amazon ECR
+- Amazon SQS
+- Amazon CloudWatch
+- Terraform (repositorio de orquestracao)
+- Swagger / OpenAPI
+- Serilog
 
 ---
 
-## Repositórios Relacionados 🔗
+## Variaveis de Ambiente
 
-- **[Orquestração](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws)**: Docker Compose e Kubernetes para toda a infraestrutura
-- **[Usuários](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-users)**: Microsserviço de autenticação e autorização
-- **[Catálogo](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-catalog)**: Microsserviço de gerenciamento de jogos e pedidos
-- **[Notificações](https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-notifications)**: Microsserviço de envio de notificações
+### Runtime da aplicacao
+
+| Variavel | Descricao | Exemplo |
+|---|---|---|
+| ASPNETCORE_ENVIRONMENT | Ambiente de execucao | Development |
+| ConnectionStrings__DefaultConnection | Connection string do banco de dados | Server=localhost,1433;Database=CloudGamesPayments;User Id=sa;Password=***;TrustServerCertificate=True; |
+| PaymentSettings__WebhookApiKey | API key para autenticacao do webhook | your-local-api-key-for-testing |
+| Queues__Payments__Commands | Nome da fila de comandos de pagamentos | payments.commands |
+| Queues__Payments__Events | Nome da fila de eventos de pagamentos | payments.events |
+| Queues__Catalog__Events | Nome da fila de eventos de catalogo | catalog.events |
+| Queues__Notifications__Events | Nome da fila de eventos de notificacoes | notifications.events |
+
+### Runtime da Lambda
+
+| Variavel | Descricao | Exemplo |
+|---|---|---|
+| PAYMENTS_NOTIFICATIONS_QUEUE_URL | URL da fila SQS de notificacoes | https://sqs.us-east-1.amazonaws.com/123456789012/payments-notifications |
+| CORRELATION_ID | Correlation ID para rastreabilidade do evento | 9f1d0c4a-7f2e-4f86-9f17-7bb6f9f1e2ac |
+
+---
+
+## Repositorios Relacionados
+
+- Orquestracao AWS: https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-orchestration-aws
+- Usuarios: https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-users
+- Catalogo: https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-catalog
+- Notificacoes: https://github.com/FIAP-10NETT-Grupo-30/cloud-games-fase-3-notifications
